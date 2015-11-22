@@ -1,0 +1,158 @@
+---
+title: "Metodologia de superfície de resposta: Uma introdução no software R"
+author: "L9(Final) - Planejamento de experimentos II"
+date: "19 de novembro de 2015"
+output: pdf_document
+---
+
+* Giovani Carrara Rodrigues 7151669
+
+# Resumo
+
+A metodologia de superfície de resposta consiste em uma coleção de técnicas
+estatísticas e matemáticas útil para desenvolvimento, melhora e otimização de processos. Ela
+também tem aplicações importantes em planejamentos, desenvolvimento e formulação de
+novos produtos, e melhoria dos projetos e produtos existentes. A mais extensiva aplicação do
+RSM é na área industrial, particularmente em situações em que entram várias variáveis que
+potencialmente influenciam em alguma medida de desempenho ou na qualidade característica
+de um produto ou processo. E, essa medida de desempenho ou qualidade característica é
+chamada de resposta. (Myers e Montgomery, 1995).
+
+Neste trabalho, mostraremos como aplicar a $\bold{RSM}$ nos software R em forma de exemplos.
+
+# 1. Introdução
+
+A metodologia de superficie de resposta é um método estatístico para a modelagem e análise de problemas nos quais a variável resposta é influenciada por vários fatores, onde buscamos a otimização dessa resposta. No software R usaremos o pacote [rsm](https://cran.r-project.org/web/packages/rsm/index.html) para aplicação do método. Vale resaltar, que a codificação apropriada dos dados é um fator importante para a análise de superfície de resposta, então o primeiro passo consiste em apresentar as codificações dos níveis dos fatores. Após esta etapa vamos ajustar os modelos e verificar a adequabilidade dos mesmos.
+
+# 2. Metodologia
+
+# 2.1 Codificação dos dados
+
+Os dados que vamos utilizar possuem o nome de *ChemReact* (Tabela 7.6 de Myers; Montgomery; Anderson-Cook, 2009), e se encontra no pacote rsm.
+
+```{r, message=FALSE}
+# carregando o pacote
+require(rsm)
+
+# Dados na variável ChemReact
+ChemReact
+
+```
+
+Primeiro vamos análisar somente o bloco 1 (B1). Observa-se que os valores dos fatores tempo(Time) e temperatura(Temp) do bloco 1 variam da seguinte forma 85 $\pm$ 5 e 175 $\pm$ 5 respectivamente, com 3 pontos centrais. Com isso temos as variáveis codificadas da seguinte maneira:
+
+$X_1=(Time-85)/5 e X_2=(Temp-175)/5$
+
+O pacote rsm possui várias funções que codificam as variáveis, nesse caso vamos usar a função *coded.data* para codificar os dados. Os valores só do bloco 1 são dados pelo conjunto de dados *ChemReact1* e os dados só com o bloco 2 pelo *ChemReact2*.
+
+```{r}
+CR1 = coded.data(ChemReact1, x1 ~(Time - 85)/5, x2 ~(Temp - 175)/5)
+CR1
+
+```
+
+Esse listagem parace muito com os dados originais, mas internamente, os dados são salvos na forma codificada como podemos ver através do seguinte "truque" de tranformar a variável em um *data.frame*.
+
+```{r}
+as.data.frame(CR1)
+
+```
+
+# 2.2 Ajustando um modelo de superfície de resposta
+
+Com os dados já codificados, no qual a produção (Yield) é a variável resposta. Vamos ajustar um modelo de primeira orderm.
+
+
+```{r}
+ CR <- coded.data(ChemReact, x1 ~(Time - 85)/5, x2 ~(Temp - 175)/5)
+
+ CR.rsm1 <- rsm(Yield~FO(x1,x2),data = CR,subset = (Block =="B1"))
+
+ summary(CR.rsm1)
+
+```
+
+Não há termos quadráticos e de interação no ajuste do modelo, vemos que as variáveis x1 e x2 não sáo significativas.
+
+Há uma falta de ajuste significativo (p-valor = 0,01), vamos então testar um modelo de ordem maior. Incluindo também as interações.
+
+```{r}
+ CR.rsm1.5 <- update(CR.rsm1,.~.+TWI(x1,x2))
+summary(CR.rsm1.5)
+
+```
+
+Novamente vemos que a falta de ajuste é significativa, com p-valor = 0,01.
+Acrescentamos então os dados do bloco 2 a fim de montar um model de segunda ordem. Fazemos isso utilizando *SO(x1,x2)*, que inclui termos quadráticos e interação:
+
+```{r}
+CR.rsm2 <- rsm(Yield ~ Block + SO(x1, x2), data = CR)
+ summary(CR.rsm2)
+
+
+```
+
+Observamos que agora a falta de ajuste é não significativo (p-valor = 0,69). O ponto de estacionariedade do modelo, isto é, ponto de máximo esta em (0,37;0,33), já que os autovalores deram negativos. temos que o ideal estimado é Tempo = 17 e Temperatura = 177.
+
+# 3. Suposições do modelo
+
+Verificar as suposições do modelo é esssencial para a análise ter validade.
+
+# 3.1 Normalidade
+
+Quando ajustamos o modelo acima o valor que a variável *CR.rsm2* quarda é um objeto com o nome de *lista* no R. Essa *lista* contém vários tipos de variáveis, e para observá-las, usamos o seguinte comando.
+
+```{r}
+ names(CR.rsm2)
+
+```
+
+*residuals* é a variável que nos interessa, pois essa quarda o valor dos resíduos.
+
+Para verificar a normalidade dos mesmos vamos utilizar a função *qqnorm* que compara os quantis dos dados com os da dirtribuição normal.
+
+```{r}
+qqnorm(CR.rsm2$residuals)
+ abline(0,1)
+```
+
+Como os pontos não estao seguindo a reta, não podemos dizer que os resíduos seguem uma distribuição normal.
+
+# 3.2 Variância Constante
+Para verificarmos se a variância dos resíduos é constante(homocedasticidade), vamos plotar o gráfico dos valores preditos x resíduos que estão quardados na variável CR.rsm2 da seguinte maneira.
+
+```{r}
+ residuos = CR.rsm2$residuals
+ preditos = CR.rsm2$fitted.values
+ 
+ plot(preditos,residuos, main = "Valores preditos x residuos")
+
+```
+
+Olhando para o gráfico não há padrões aparentemente detectáveis, ou seja, a variância parece ser constante.
+
+
+# 3.3 Ajuste do Modelo
+Um modo de se verificar a qualidade do ajuste é plotar o gráfico de valores observados x valores preditos. Quanto mais próximos à reta identidade,  melhor é a qualidade do ajuste.
+
+```{r}
+ preditos = CR.rsm2$fitted.values
+plot(ChemReact$Yield, preditos, main ="Valores observados x valores preditos")
+abline(0,1)
+```
+
+Portanto, notamos que o modelo possui boa qualidade de ajuste, já que prevê corretamente boa parte das vezes, e quando comete erro não se distancia muito da reta identidade.
+
+# 4 Comentários Finais
+
+O conjunto de técnicas usando a metodologia de superfície de resposta são muito úteis para otimização de processos.
+
+Primeiramente codificamos os dados (*ChemReact*, presente no pacote RSM) em R, de variáveis naturais para variáveis codificadas, e então propomos alguns modelos e verificamos qual deles se adequou melhor aos dados. Após isso, realizamos uma análise de resíduos para validar ou não nossa análise por superfície de resposta. Contudo os resíduos não possuíram normalidade mas foi um bom exemplo de como aplicar tal análise no cotidiano.
+
+# Referências bibliográficas
+
+Comparini A., Passos G., Graziadei H., Ferreira-Silva P., \newline 
+Louzada F. **Metodologia de Superfície de Respota: Uma Introdução nos softwares R e Statistica**
+
+
+
