@@ -152,7 +152,7 @@ Primeiramente codificamos os dados (*ChemReact*, presente no pacote RSM) em R, d
 # Referências bibliográficas
 
 Comparini A., Passos G., Graziadei H., Ferreira-Silva P., \newline 
-Louzada F. **Metodologia de Superfície de Respota: Uma Introdução nos softwares R e Statistica**
+Louzada F. **Metodologia de Superfície de Respota: Uma Introdução no software R**
 
 
 
